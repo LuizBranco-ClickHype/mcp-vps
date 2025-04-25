@@ -77,7 +77,8 @@ cat > $MCP_DIR/package.json << EOL
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "morgan": "^1.10.0"
   }
 }
 EOL
@@ -108,50 +109,153 @@ cat > $MCP_DIR/index.js << EOL
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const morgan = require('morgan'); // Para logs de requisição
+const fs = require('fs');
+const path = require('path');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// Cria diretório de logs
+const logDir = path.join(__dirname, 'logs');
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir);
+}
 
-// Middleware de autenticação
+// Configura o logger
+const accessLogStream = fs.createWriteStream(
+  path.join(logDir, 'access.log'),
+  { flags: 'a' }
+);
+
+// Middleware básicos
+app.use(cors({
+  origin: '*',
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+app.use(express.json());
+app.use(morgan('combined', { stream: accessLogStream }));
+
+// Middleware para log de todas as requisições (para debug)
+app.use((req, res, next) => {
+  console.log(\`\${new Date().toISOString()} - \${req.method} \${req.url} - IP: \${req.ip}\`);
+  console.log('Headers:', JSON.stringify(req.headers));
+  next();
+});
+
+// Middleware de autenticação melhorado
 const authenticateToken = (req, res, next) => {
+  console.log('Autenticando requisição...');
+  let token = null;
+  
+  // Tenta obter o token do cabeçalho Authorization
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  if (authHeader) {
+    if (authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+      console.log('Token extraído do Bearer:', token);
+    } else {
+      token = authHeader;
+      console.log('Token extraído diretamente do Authorization:', token);
+    }
+  }
   
-  if (token == null) return res.status(401).json({ error: 'Token de acesso não fornecido' });
-  if (token !== ACCESS_TOKEN) return res.status(403).json({ error: 'Token de acesso inválido' });
+  // Tenta obter o token do parâmetro de consulta
+  if (!token && req.query.token) {
+    token = req.query.token;
+    console.log('Token extraído do query parameter:', token);
+  }
   
+  // Tenta obter o token do env.API_KEY (formato MCP específico)
+  if (!token && req.headers['x-api-key']) {
+    token = req.headers['x-api-key'];
+    console.log('Token extraído do X-API-KEY header:', token);
+  }
+  
+  // Se nenhuma das opções acima, assume que o endpoint não requer autenticação
+  if (!token) {
+    if (req.path === '/status' || req.path === '/') {
+      console.log('Rota pública, continuando sem autenticação');
+      return next();
+    }
+    
+    console.log('Token não fornecido');
+    return res.status(401).json({ 
+      error: 'Token de acesso não fornecido',
+      message: 'Por favor, forneça um token de acesso válido. Verifique a documentação para mais informações.'
+    });
+  }
+  
+  // Log para debug
+  console.log('Comparando tokens:');
+  console.log('Token recebido:', token);
+  console.log('Token esperado:', ACCESS_TOKEN);
+  
+  // Verifica se o token é válido
+  if (token !== ACCESS_TOKEN) {
+    console.log('Token inválido');
+    return res.status(401).json({ 
+      error: 'Token de acesso inválido',
+      message: 'O token fornecido não é válido. Por favor, verifique o token e tente novamente.'
+    });
+  }
+  
+  console.log('Token válido, autenticação bem-sucedida');
   next();
 };
 
-// Endpoint para verificar status
-app.get('/status', (req, res) => {
-  res.json({ status: 'online' });
-});
-
-// Endpoint para obter descrição do servidor MCP
-app.get('/description', (req, res) => {
+// Rota raiz para informações básicas
+app.get('/', (req, res) => {
   res.json({
     name: "cursor-mcp-server",
     version: "1.0.0",
-    description: "Servidor MCP para Cursor AI"
+    description: "Servidor MCP para Cursor AI",
+    endpoints: [
+      { path: "/", method: "GET", description: "Esta informação" },
+      { path: "/status", method: "GET", description: "Verificar status do servidor" },
+      { path: "/sse", method: "GET", description: "Endpoint SSE para o Cursor AI (requer autenticação)" },
+      { path: "/test-auth", method: "GET", description: "Testar autenticação" }
+    ]
+  });
+});
+
+// Endpoint de teste simplificado para verificar conectividade
+app.get('/status', (req, res) => {
+  res.json({ 
+    status: 'online', 
+    time: new Date().toISOString(),
+    serverId: ACCESS_TOKEN.substring(0, 8)
+  });
+});
+
+// Endpoint para testar autenticação
+app.get('/test-auth', authenticateToken, (req, res) => {
+  res.json({ 
+    message: 'Autenticação bem-sucedida!',
+    time: new Date().toISOString()
   });
 });
 
 // Rota principal para o endpoint SSE do MCP
 app.get('/sse', authenticateToken, (req, res) => {
+  console.log('Conexão SSE estabelecida');
+  
+  // Configurações padrão do SSE
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   
   // Função de envio de eventos para o cliente
   const sendEvent = (event, data) => {
-    res.write(\`event: \${event}\\n\`);
-    res.write(\`data: \${JSON.stringify(data)}\\n\\n\`);
+    const eventString = \`event: \${event}\\ndata: \${JSON.stringify(data)}\\n\\n\`;
+    console.log(\`Enviando evento: \${event}\`);
+    res.write(eventString);
   };
 
   // Envia informações sobre as ferramentas disponíveis
@@ -170,30 +274,74 @@ app.get('/sse', authenticateToken, (req, res) => {
           },
           required: ["query"]
         }
+      },
+      {
+        name: "servidor_info",
+        description: "Retorna informações sobre o servidor MCP",
+        parameters: {
+          type: "object",
+          properties: {}
+        }
       }
     ]
   });
 
+  // Diz ao cliente que a configuração inicial está completa
+  sendEvent('ready', { 
+    time: new Date().toISOString(),
+    message: "Servidor MCP pronto para uso"
+  });
+
   // Configura o tratamento de ferramenta "exemplo_ferramenta"
   app.post('/tools/exemplo_ferramenta', authenticateToken, (req, res) => {
+    console.log('Ferramenta exemplo_ferramenta chamada:', req.body);
     const { query } = req.body;
     
     // Simula o processamento da ferramenta
     setTimeout(() => {
       res.json({
-        result: \`Resposta processada para: \${query}\`
+        result: \`Resposta processada para: \${query || 'consulta vazia'}\`
       });
     }, 500);
   });
 
-  // Mantém a conexão aberta
+  // Configura o tratamento da ferramenta servidor_info
+  app.post('/tools/servidor_info', authenticateToken, (req, res) => {
+    console.log('Ferramenta servidor_info chamada');
+    
+    const serverInfo = {
+      host: HOST,
+      port: PORT,
+      nodeVersion: process.version,
+      uptime: process.uptime(),
+      memoryUsage: process.memoryUsage(),
+      timestamp: new Date().toISOString()
+    };
+    
+    res.json({
+      result: serverInfo
+    });
+  });
+
+  // Mantém a conexão aberta com ping periódico
   const pingInterval = setInterval(() => {
     sendEvent('ping', { timestamp: Date.now() });
   }, 30000);
 
   // Fecha a conexão e limpa o intervalo quando o cliente desconecta
   req.on('close', () => {
+    console.log('Cliente desconectou-se do SSE');
     clearInterval(pingInterval);
+  });
+});
+
+// Tratamento global de erros
+app.use((err, req, res, next) => {
+  console.error('Erro:', err.stack);
+  res.status(500).json({
+    error: 'Erro interno do servidor',
+    message: err.message || 'Algo deu errado',
+    path: req.path
   });
 });
 
@@ -218,9 +366,10 @@ WorkingDirectory=$MCP_DIR
 ExecStart=$(which node) $MCP_DIR/index.js
 Restart=on-failure
 RestartSec=10
-StandardOutput=syslog
-StandardError=syslog
+StandardOutput=journal
+StandardError=journal
 SyslogIdentifier=mcp-server
+Environment=NODE_ENV=production
 
 [Install]
 WantedBy=multi-user.target
@@ -250,14 +399,28 @@ if systemctl is-active --quiet mcp-server; then
     echo -e "Endpoint SSE: http://$IP_ADDR:3000/sse"
     echo -e "Token de acesso: $TOKEN"
     echo -e "${VERDE}==========================================${NC}"
+    echo -e "Para testar a API:"
+    echo -e "curl http://$IP_ADDR:3000/status"
+    echo -e "curl -H \"Authorization: Bearer $TOKEN\" http://$IP_ADDR:3000/test-auth"
+    echo -e "${VERDE}==========================================${NC}"
     echo -e "Para configurar no Cursor AI:"
-    echo -e "1. Acesse as configurações do Cursor"
-    echo -e "2. Vá para a seção MCP"
-    echo -e "3. Adicione http://$IP_ADDR:3000/sse como servidor SSE"
-    echo -e "4. Use o token de acesso acima para autenticação"
+    echo -e "1. Edite o arquivo ~/.cursor/mcp.json"
+    echo -e "2. Adicione esta configuração:"
+    echo -e "${VERDE}"
+    echo -e '{
+  "mcpServers": {
+    "mcp-vps": {
+      "url": "http://'"$IP_ADDR"':3000/sse",
+      "env": {
+        "API_KEY": "'"$TOKEN"'"
+      }
+    }
+  }
+}'
+    echo -e "${NC}"
     echo -e "${VERDE}==========================================${NC}"
     echo -e "Para verificar o status: systemctl status mcp-server"
-    echo -e "Para ver os logs: journalctl -u mcp-server"
+    echo -e "Para ver os logs: journalctl -u mcp-server -f"
     echo -e "${VERDE}==========================================${NC}"
 else
     erro "Houve um problema ao iniciar o MCP Server. Verifique os logs com 'journalctl -u mcp-server'"
