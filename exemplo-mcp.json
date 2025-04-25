@@ -1,9 +1,27 @@
 {
   "mcpServers": {
-    "mcp-vps": {
+    "mcp-vps-padrao": {
       "url": "http://SEU_IP_DA_VPS:3000/sse",
       "env": {
         "API_KEY": "SEU_TOKEN_DE_ACESSO"
+      }
+    },
+    
+    "mcp-vps-alt1": {
+      "url": "http://SEU_IP_DA_VPS:3000/sse",
+      "headers": {
+        "Authorization": "Bearer SEU_TOKEN_DE_ACESSO"
+      }
+    },
+    
+    "mcp-vps-alt2": {
+      "url": "http://SEU_IP_DA_VPS:3000/sse?token=SEU_TOKEN_DE_ACESSO"
+    },
+    
+    "mcp-vps-alt3": {
+      "url": "http://SEU_IP_DA_VPS:3000/sse",
+      "headers": {
+        "X-API-KEY": "SEU_TOKEN_DE_ACESSO"
       }
     }
   }
