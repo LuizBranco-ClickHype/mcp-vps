@@ -69,7 +69,7 @@ No Cursor, você precisa configurar o arquivo `mcp.json` para se conectar ao ser
 
 #### Localização do arquivo mcp.json
 
-- Windows: `C:\Users\seu-usuario\.cursor\mcp.json`
+- Windows: `C:\\Users\\seu-usuario\\.cursor\\mcp.json`
 - macOS: `~/.cursor/mcp.json`
 - Linux: `~/.cursor/mcp.json`
 
@@ -145,6 +145,81 @@ sudo systemctl stop mcp-server
 # Visualizar logs
 sudo journalctl -u mcp-server
 ```
+
+## Solução de Problemas
+
+Para ajudar a diagnosticar e resolver problemas comuns de conexão, disponibilizamos um script de diagnóstico.
+
+### Script de Diagnóstico
+
+Execute o seguinte comando para baixar e executar o script de diagnóstico:
+
+```bash
+curl -O https://raw.githubusercontent.com/LuizBranco-ClickHype/mcp-vps/main/solucionar_problemas.sh && chmod +x solucionar_problemas.sh && sudo ./solucionar_problemas.sh
+```
+
+O script fará as seguintes verificações:
+- Status da instalação do MCP Server
+- Versão do Node.js
+- Configurações de firewall
+- Acessibilidade de portas
+- Validade do token de acesso
+- Teste básico de conectividade HTTP
+
+### Problemas Comuns
+
+#### Cursor não consegue conectar ao servidor
+
+1. **Verifique se o servidor está em execução:**
+   ```bash
+   sudo systemctl status mcp-server
+   ```
+   Se estiver inativo, reinicie com: `sudo systemctl restart mcp-server`
+
+2. **Verifique se a porta está aberta:**
+   ```bash
+   sudo ufw status | grep 3000
+   ```
+   Se não estiver, abra a porta: `sudo ufw allow 3000/tcp`
+
+3. **Verifique seu arquivo mcp.json:**
+   - Certifique-se de que o URL tenha o formato correto: `http://IP_DA_VPS:3000/sse`
+   - Verifique se o token está correto (encontre-o em `/opt/mcp-server/.env`)
+
+4. **Teste conectividade HTTP básica:**
+   ```bash
+   curl -v http://localhost:3000/ping
+   ```
+   Deve retornar "pong" se o servidor estiver funcionando corretamente.
+
+#### Problemas de autenticação
+
+1. **Recupere seu token de acesso:**
+   ```bash
+   sudo cat /opt/mcp-server/.env | grep API_KEY
+   ```
+
+2. **Verifique se o token no arquivo mcp.json corresponde ao armazenado no servidor**
+
+3. **Se necessário, gere um novo token:**
+   ```bash
+   sudo -i
+   cd /opt/mcp-server
+   API_KEY=$(openssl rand -hex 32)
+   sed -i "s/API_KEY=.*/API_KEY=$API_KEY/" .env
+   systemctl restart mcp-server
+   echo "Novo token gerado: $API_KEY"
+   ```
+   Lembre-se de atualizar o arquivo mcp.json com o novo token.
+
+#### Logs para depuração avançada
+
+Para visualizar logs detalhados do servidor:
+```bash
+sudo journalctl -u mcp-server -f
+```
+
+Esse comando mostrará logs em tempo real, úteis para identificar erros durante tentativas de conexão.
 
 ## Segurança
 
