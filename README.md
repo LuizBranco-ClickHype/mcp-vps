@@ -42,8 +42,72 @@ Após a instalação, você poderá conectar seu MCP Server ao Cursor AI:
 1. Abra o Cursor AI
 2. Acesse as configurações
 3. Vá para a seção MCP
-4. Adicione o URL do seu servidor: `http://seu-ip:3000/sse`
-5. Use o token de acesso gerado durante a instalação como chave de autenticação
+4. Adicione o URL do seu servidor conforme instruções abaixo
+
+### Configuração do arquivo mcp.json
+
+No Cursor, você precisa configurar o arquivo `mcp.json` para se conectar ao servidor MCP na sua VPS. 
+
+#### Localização do arquivo mcp.json
+
+- Windows: `C:\Users\seu-usuario\.cursor\mcp.json`
+- macOS: `~/.cursor/mcp.json`
+- Linux: `~/.cursor/mcp.json`
+
+#### Conteúdo do arquivo mcp.json
+
+Adicione a seguinte configuração ao seu arquivo `mcp.json`. Se o arquivo já existir, adicione apenas a seção "mcp-vps" dentro do objeto "mcpServers":
+
+```json
+{
+  "mcpServers": {
+    "mcp-vps": {
+      "url": "http://SEU_IP_DA_VPS:3000/sse",
+      "env": {
+        "API_KEY": "SEU_TOKEN_DE_ACESSO"
+      }
+    }
+  }
+}
+```
+
+Substitua:
+- `SEU_IP_DA_VPS` pelo endereço IP ou domínio da sua VPS
+- `SEU_TOKEN_DE_ACESSO` pelo token gerado durante a instalação (exibido ao final do processo ou disponível no arquivo `.env` em `/opt/mcp-server/`)
+
+Se você já tem outros servidores MCP configurados (como GitHub), mantenha-os e apenas adicione a nova configuração:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "@dev-assistant-ai/github",
+        "--key",
+        "sua-chave-github"
+      ]
+    },
+    "mcp-vps": {
+      "url": "http://SEU_IP_DA_VPS:3000/sse",
+      "env": {
+        "API_KEY": "SEU_TOKEN_DE_ACESSO"
+      }
+    }
+  }
+}
+```
+
+#### Depois da configuração
+
+1. Salve o arquivo mcp.json
+2. Reinicie o Cursor para que as alterações sejam aplicadas
+3. Verifique nas configurações do Cursor se o servidor MCP aparece na lista de servidores disponíveis
 
 O Cursor AI agora poderá se comunicar com seu MCP Server, permitindo a utilização das ferramentas disponibilizadas.
 
