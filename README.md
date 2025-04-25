@@ -44,7 +44,26 @@ Após a instalação, você poderá conectar seu MCP Server ao Cursor AI:
 3. Vá para a seção MCP
 4. Adicione o URL do seu servidor conforme instruções abaixo
 
-### Configuração do arquivo mcp.json
+### Scripts de configuração automática
+
+Para facilitar a configuração, disponibilizamos scripts que configuram automaticamente o Cursor:
+
+#### Windows
+
+1. Baixe o script [configurar_cursor_windows.bat](https://raw.githubusercontent.com/LuizBranco-ClickHype/mcp-vps/main/configurar_cursor_windows.bat)
+2. Clique com o botão direito e selecione "Executar como administrador"
+3. Digite o IP da sua VPS e o token de acesso quando solicitado
+4. Reinicie o Cursor
+
+#### macOS e Linux
+
+1. Baixe o script [configurar_cursor_unix.sh](https://raw.githubusercontent.com/LuizBranco-ClickHype/mcp-vps/main/configurar_cursor_unix.sh)
+2. Torne-o executável: `chmod +x configurar_cursor_unix.sh`
+3. Execute-o: `./configurar_cursor_unix.sh`
+4. Digite o IP da sua VPS e o token de acesso quando solicitado
+5. Reinicie o Cursor
+
+### Configuração manual do arquivo mcp.json
 
 No Cursor, você precisa configurar o arquivo `mcp.json` para se conectar ao servidor MCP na sua VPS. 
 
