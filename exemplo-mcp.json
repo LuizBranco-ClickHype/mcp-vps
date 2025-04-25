@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "mcp-vps": {
+      "url": "http://SEU_IP_DA_VPS:3000/sse",
+      "env": {
+        "API_KEY": "SEU_TOKEN_DE_ACESSO"
+      }
+    }
+  }
+}
